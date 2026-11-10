@@ -441,7 +441,7 @@ def cmd_orb(a):
             raise ScanError("%s has no hits. Run: python3 scan.py daily" % a.watchlist)
     else:
         raise ScanError("nothing to scan. Pass --symbols, or run scan.py daily first.")
-    rows, errors = [], []
+    rows, errors, throttled = [], [], None
     for k, sym in enumerate(syms[:a.max_charts]):
         try:
             if a.offline:
@@ -469,6 +469,11 @@ def cmd_orb(a):
                 continue
             o["symbol"] = sym
             rows.append(o)
+        except nsedata.ThrottledError as e:
+            # Stop here on purpose: see nsedata.ThrottledError. Whatever was read
+            # before the ban is still reported.
+            throttled = str(e)
+            break
         except ScanError as e:
             errors.append((sym, str(e)))
     hit = [r for r in rows if r["hit"]]
@@ -476,7 +481,8 @@ def cmd_orb(a):
     out = {"as_of": now.isoformat(timespec="minutes"), "day": day.isoformat(),
            "or_minutes": a.or_minutes, "session": "%s to %s" % (open_t.strftime("%H:%M"),
                                                                 close_t.strftime("%H:%M")),
-           "scanned": len(rows), "breakouts": hit, "errors": [{"symbol": s, "why": w} for s, w in errors]}
+           "scanned": len(rows), "breakouts": hit, "throttled": throttled,
+           "errors": [{"symbol": s, "why": w} for s, w in errors]}
     if not a.no_write:
         d = os.path.dirname(a.out)
         if d:
@@ -496,6 +502,9 @@ def cmd_orb(a):
               % (r["symbol"], r["range_low"], r["range_high"], r["close"], r["at"], r["over_pct"]))
     for s, w in errors[:5]:
         print("  note %-12s %s" % (s, w), file=sys.stderr)
+    if throttled:
+        print("\nSTOPPED after %d of %d charts: %s" % (len(rows), len(syms[:a.max_charts]),
+                                                       throttled), file=sys.stderr)
     if not a.no_write:
         print("Wrote %s." % a.out)
     return 0

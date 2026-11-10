@@ -247,6 +247,56 @@ class RealSession(unittest.TestCase):
         self.assertIn("Opening range 09:15 to 09:30 IST", out)
 
 
+class Throttling(unittest.TestCase):
+    def test_a_throttle_stops_the_loop_instead_of_retrying_every_symbol(self):
+        """Yahoo bans by IP, so the second symbol fails for the same reason as the first.
+
+        Before this, a 20 chart scan against a throttled IP spent a 20 second backoff
+        per symbol and took longer than the opening range it was measuring. The ban is
+        one fact about the network, not twenty facts about twenty stocks.
+        """
+        calls = []
+
+        def throttled(path):
+            calls.append(path)
+            # scan.nsedata.ThrottledError, not this file's: vendoring means two module
+            # instances, so there are two distinct exception CLASSES with the same
+            # name, and scan.py's except clause only matches its own. Harmless in
+            # production, where a process loads one copy, and a trap in a test.
+            raise scan.nsedata.ThrottledError("Yahoo has rate limited this IP")
+
+        # Patch the module the SCRIPT imported, not the canonical one the test loaded.
+        # Each skill imports its own vendored copy, so scan.nsedata and this file's
+        # nsedata are different objects. Patching the wrong one let the real call
+        # through: the test passed over the network and took 20 seconds.
+        real = scan.nsedata.yahoo_get
+        scan.nsedata.yahoo_get = throttled
+        try:
+            buf, err = io.StringIO(), io.StringIO()
+            with redirect_stdout(buf), redirect_stderr(err):
+                rc = scan.main(["orb", "--symbols", "TCS,RELIANCE,SBIN,INFY,LT",
+                                "--now", "2026-11-09 10:00", "--no-write", "--pause", "0"])
+            self.assertEqual(rc, 0)
+            self.assertEqual(len(calls), 1, "should stop after the first throttle")
+            self.assertIn("STOPPED after 0 of 5 charts", err.getvalue())
+        finally:
+            scan.nsedata.yahoo_get = real
+
+    def test_a_throttle_is_a_data_error_so_old_handlers_still_catch_it(self):
+        self.assertTrue(issubclass(nsedata.ThrottledError, nsedata.DataError))
+
+    def test_the_script_and_the_test_see_the_same_vendored_code(self):
+        """Different module objects, identical source. The reason the patch above has
+        to target scan.nsedata, and the reason vendoring is tested at all."""
+        self.assertIsNot(scan.nsedata, nsedata)
+        self.assertEqual(scan.nsedata.BACKOFF, nsedata.BACKOFF)
+        self.assertTrue(issubclass(scan.nsedata.ThrottledError, scan.nsedata.DataError))
+        # Same name, same source, different class object. Worth asserting so the next
+        # person writing a test here sees why a cross-module raise is not caught.
+        self.assertIsNot(scan.nsedata.ThrottledError, nsedata.ThrottledError)
+        self.assertFalse(issubclass(nsedata.ThrottledError, scan.nsedata.DataError))
+
+
 class EndToEnd(unittest.TestCase):
     def test_the_daily_scan_runs_on_the_fixtures(self):
         buf, err = io.StringIO(), io.StringIO()

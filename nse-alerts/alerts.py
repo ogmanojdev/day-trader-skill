@@ -120,6 +120,10 @@ def live_prices(symbols, cache_dir, offline=None, pause=1.0):
                 if px is not None:
                     out[sym] = (float(px), "Yahoo 5m", nsecal.ist_now())
                     got = True
+            except nsedata.ThrottledError as e:
+                # One message, then fall through to the settled close for everything.
+                print("note: %s" % e, file=sys.stderr)
+                break
             except nsedata.DataError:
                 pass
         if not got:

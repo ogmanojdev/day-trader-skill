@@ -39,7 +39,7 @@ import time
 import urllib.error
 import urllib.request
 
-__all__ = ["DataError", "UA", "NSE_ARCHIVE", "NSE_API", "YAHOO_HOSTS", "EQUITY_L", "SEC_LIST",
+__all__ = ["DataError", "ThrottledError", "UA", "NSE_ARCHIVE", "NSE_API", "YAHOO_HOSTS", "EQUITY_L", "SEC_LIST",
            "BULK_DEALS", "BLOCK_DEALS", "TRADEABLE_SERIES", "http_get", "nse_get", "nse_api",
            "yahoo_get", "to_yahoo", "chart_path", "rows_of", "num", "is_etf", "parse_universe",
            "read_universe", "write_universe", "bhav_date_in", "fetch_bhav", "bhav_ladder",
@@ -61,6 +61,18 @@ SLEEP = time.sleep
 
 
 class DataError(Exception):
+    pass
+
+
+class ThrottledError(DataError):
+    """Yahoo has rate limited this IP.
+
+    Its own class because the right response is to stop, not to retry the next
+    symbol. The ban is per IP and lasts minutes to hours, so a loop over twenty
+    charts that treats each 429 as that symbol's problem spends twenty backoffs
+    discovering the same fact. The first scan written without this took longer
+    than the opening range it was trying to measure.
+    """
     pass
 
 
@@ -127,6 +139,11 @@ def yahoo_get(path):
             SLEEP(BACKOFF)
             continue
         break
+    if last == "HTTP 429":
+        raise ThrottledError(
+            "Yahoo has rate limited this IP (429 on both hosts, after a retry). It bans by "
+            "IP for minutes to hours, so the next symbol will fail the same way. Wait, or "
+            "pass --offline, or read the opening range off your broker's chart.")
     raise DataError("Yahoo answered %s for %s. It throttles by IP; wait a few minutes "
                     "or pass --offline." % (last, path.split("?")[0]))
 
