@@ -79,8 +79,9 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import nsecal   # noqa: E402  (vendored; see tools/vendor.py)
-import nsedata  # noqa: E402
+import nsecal       # noqa: E402  (vendored; see tools/vendor.py)
+import nsedata      # noqa: E402
+import sanyamstore  # noqa: E402
 
 ScanError = nsedata.DataError
 num = nsedata.num
@@ -421,6 +422,46 @@ def orb_for(bars, or_minutes, minutes=5):
             "bars": len(bars)}
 
 
+def intraday_series(sym, day, a):
+    """(series, origin) for one symbol's session. Three sources, one shape.
+
+    All three return what nsedata.series_from_chart returns, so the grid checks,
+    the completeness rule and the range arithmetic below are identical whichever
+    one answered. Order of preference is the order of trust: a saved fixture is
+    reproducible, Sanyam's store is the broker's own bars and needs no network,
+    Yahoo is the fallback that throttles.
+    """
+    if a.offline:
+        p = os.path.join(a.offline, "chart-%s-1d-5m.json"
+                         % nsedata.to_yahoo(sym).replace("^", "idx-"))
+        if not os.path.exists(p):
+            raise ScanError("no fixture %s" % os.path.basename(p))
+        with open(p, encoding="utf-8") as fh:
+            return nsedata.series_from_chart(fh.read()), "fixture"
+    if a.sanyam is not None:
+        db = sanyamstore.find_db(a.sanyam or None)
+        open_t, close_t = nsecal.session_or_raise(day)
+        start = int((nsecal.ist_to_utc(datetime.datetime.combine(day, open_t))
+                     - nsecal.EPOCH).total_seconds())
+        end = int((nsecal.ist_to_utc(datetime.datetime.combine(day, close_t))
+                   - nsecal.EPOCH).total_seconds())
+        bars = sanyamstore.read_bars(db, sym, "5m", start, end)
+        origin = "sanyam 5m"
+        if not bars:
+            # 1m is Sanyam's base interval, so 5m is usually derived rather than stored.
+            one = sanyamstore.read_bars(db, sym, "1m", start, end)
+            if one:
+                bars = sanyamstore.aggregate(one, 300)
+                origin = "sanyam 1m aggregated"
+        if not bars:
+            raise ScanError(sanyamstore.EMPTY_HELP % (
+                sanyamstore.sanyam_symbol(sym), "5m or 1m",
+                sanyamstore.sanyam_symbol(sym), day.isoformat(), day.isoformat()))
+        return sanyamstore.as_series(bars), origin
+    return nsedata.series_from_chart(
+        nsedata.yahoo_get(nsedata.chart_path(sym, "1d", "5m"))), "yahoo"
+
+
 def cmd_orb(a):
     now = nsecal.parse_ist(a.now, "--now") if a.now else nsecal.ist_now()
     if a.at:
@@ -441,20 +482,20 @@ def cmd_orb(a):
             raise ScanError("%s has no hits. Run: python3 scan.py daily" % a.watchlist)
     else:
         raise ScanError("nothing to scan. Pass --symbols, or run scan.py daily first.")
-    rows, errors, throttled = [], [], None
+    rows, errors, throttled, origins = [], [], None, {}
     for k, sym in enumerate(syms[:a.max_charts]):
         try:
-            if a.offline:
-                p = os.path.join(a.offline, "chart-%s-1d-5m.json" % nsedata.to_yahoo(sym).replace("^", "idx-"))
-                if not os.path.exists(p):
-                    errors.append((sym, "no fixture %s" % os.path.basename(p)))
-                    continue
-                text = open(p, encoding="utf-8").read()
-            else:
-                if k and a.pause:
-                    SLEEP(a.pause)
-                text = nsedata.yahoo_get(nsedata.chart_path(sym, "1d", "5m"))
-            ser = nsedata.series_from_chart(text)
+            if k and a.pause and a.sanyam is None and not a.offline:
+                SLEEP(a.pause)      # only the network source needs pacing
+            ser, origin = intraday_series(sym, day, a)
+            origins[origin] = origins.get(origin, 0) + 1
+            worst = (ser.get("meta") or {}).get("_worst_source")
+            if worst and worst not in sanyamstore.TRUSTED_SOURCES and not a.allow_live_agg:
+                errors.append((sym, "bars are %s: aggregated from a ~1 Hz price poll, so "
+                                    "the intrabar high and low are approximate and the "
+                                    "opening range would be too narrow. Pass "
+                                    "--allow-live-agg to use them anyway." % worst))
+                continue
             bars = session_bars(ser, day, now)
             if not bars:
                 errors.append((sym, "no completed on-grid bars for %s by %s"
@@ -482,6 +523,7 @@ def cmd_orb(a):
            "or_minutes": a.or_minutes, "session": "%s to %s" % (open_t.strftime("%H:%M"),
                                                                 close_t.strftime("%H:%M")),
            "scanned": len(rows), "breakouts": hit, "throttled": throttled,
+           "bar_sources": origins,
            "errors": [{"symbol": s, "why": w} for s, w in errors]}
     if not a.no_write:
         d = os.path.dirname(a.out)
@@ -492,6 +534,8 @@ def cmd_orb(a):
     if a.json:
         print(json.dumps(out, indent=2))
         return 0
+    if origins:
+        print("bars from %s" % ", ".join("%s (%d)" % (o, n) for o, n in sorted(origins.items())))
     print("Opening range %s to %s IST, clock at %s. %d charts read, %d broke out."
           % (open_t.strftime("%H:%M"),
              (datetime.datetime.combine(day, open_t) +
@@ -550,6 +594,11 @@ def main(argv=None):
     p.add_argument("--now", help='pretend it is this IST time, e.g. "2026-11-09 10:00"')
     p.add_argument("--min-price", type=float, default=20.0)
     p.add_argument("--max-charts", type=int, default=40, help="Yahoo throttles; keep this small")
+    p.add_argument("--sanyam", nargs="?", const="", metavar="DB",
+                   help="read bars from Sanyam's candle store instead of Yahoo (no network "
+                        "call). The path is found automatically if omitted.")
+    p.add_argument("--allow-live-agg", action="store_true",
+                   help="accept LIVE_AGG bars, whose intrabar extremes are approximate")
     p.add_argument("--pause", type=float, default=1.0)
     p.add_argument("--show", type=int, default=25)
     p.add_argument("--offline", metavar="DIR", help="a directory of chart-SYM.NS-1d-5m.json files")

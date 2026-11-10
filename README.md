@@ -83,6 +83,18 @@ market is otherwise shut, which in 2026 fell on a Sunday. The table is dated
 and ends where NSE's published list ends; past that, dates are reported unknown
 rather than guessed.
 
+**Intraday bars come from Sanyam, not Yahoo.** `nse-common/sanyamstore.py`
+reads Sanyam's candle store directly with `sqlite3`, read-only, so `orb`, the
+Time Machine and alerts need no network call at all. Yahoo stays as the
+fallback. It matters because Yahoo throttles by IP for hours after a dozen
+calls, long enough to miss the session. Sanyam's `HISTORY` bars give a
+byte-identical opening range to the Yahoo chart for the same session.
+
+`LIVE_AGG` bars are refused for an opening range. They are aggregated from a
+roughly 1 Hz price poll and miss intrabar extremes, and the range is built from
+highs and lows: on the TCS session in the fixtures that makes the range 36%
+narrower and turns a close inside the real range into a breakout.
+
 **The data.** `EQUITY_L.csv` for the universe, `sec_bhavdata_full` for the
 whole market's settled prices in one request, `sec_list.csv` for price bands,
 `reportASM` for surveillance, `bulk.csv` and `block.csv` for deals,
@@ -100,11 +112,11 @@ pattern-day-trader rule, so that guard is simply gone.
 ```bash
 python3 nse-scanner/scan.py universe                      # EQUITY_L.csv -> trader/universe.txt
 python3 nse-scanner/scan.py daily                         # whole market -> trader/watchlist.json
-python3 nse-scanner/scan.py orb --at 10:00                # opening-range breakouts
+python3 nse-scanner/scan.py orb --sanyam --at 10:00       # bars from Sanyam, no network
 python3 nse-scanner/scan.py bands                         # price bands + ASM
 python3 nse-news/news.py --symbols RELIANCE --hours 12
 python3 nse-news/news.py announcements --hours 24
-python3 nse-timemachine/timemachine.py run --plan trader/plan.json
+python3 nse-timemachine/timemachine.py run --plan trader/plan.json --sanyam
 python3 nse-alerts/alerts.py add --from-plan
 python3 nse-alerts/alerts.py check
 python3 nse-analyst/facts.py RELIANCE
@@ -113,7 +125,8 @@ python3 nse-deals/deals.py
 python3 nse-deals/deals.py insider --days 30
 ```
 
-Shared code lives in `nse-common/` and is copied into each skill folder by
+Shared code lives in `nse-common/` (the clock and calendar, the cost model, the
+NSE sources, the Sanyam store reader) and is copied into each skill folder by
 `tools/vendor.py`, because a skill folder has to stand alone. The suite fails
 if a copy drifts.
 

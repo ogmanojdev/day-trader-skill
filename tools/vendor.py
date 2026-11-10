@@ -17,7 +17,7 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(ROOT, "nse-common")
-MODULES = ["nsecal.py", "charges.py", "nsedata.py"]
+MODULES = ["nsecal.py", "charges.py", "nsedata.py", "sanyamstore.py"]
 SKILLS = ["nse-scanner", "nse-news", "nse-timemachine", "nse-alerts", "nse-analyst", "nse-deals"]
 BANNER = ("# Vendored from nse-common/%s by tools/vendor.py. Do not edit here:\n"
           "# edit nse-common/%s and re-run the script, or the suite will fail.\n")

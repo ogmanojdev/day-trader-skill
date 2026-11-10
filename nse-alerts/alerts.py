@@ -42,9 +42,10 @@ import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import charges  # noqa: E402  (vendored; see tools/vendor.py)
-import nsecal   # noqa: E402
-import nsedata  # noqa: E402
+import charges      # noqa: E402  (vendored; see tools/vendor.py)
+import nsecal       # noqa: E402
+import nsedata      # noqa: E402
+import sanyamstore  # noqa: E402
 
 AlertError = nsedata.DataError
 KINDS = ("above", "below", "at_time")
@@ -91,14 +92,25 @@ def describe(r):
 
 # ---------------------------------------------------------------- prices
 
-def live_prices(symbols, cache_dir, offline=None, pause=1.0):
+def live_prices(symbols, cache_dir, offline=None, pause=1.0, sanyam=None):
     """{symbol: (price, source, as_of)}. Yahoo when it answers, else the last
     settled close, with the source named so a stale number is never silently
     treated as live."""
     out = {}
+    store_db = None
+    if sanyam is not None:
+        store_db = sanyamstore.find_db(sanyam or None)
     for k, sym in enumerate(sorted(set(symbols))):
         got = False
-        if offline:
+        if store_db:
+            bars = sanyamstore.read_bars(store_db, sym, "5m") or \
+                sanyamstore.read_bars(store_db, sym, "1m")
+            if bars:
+                last = bars[-1]
+                out[sym] = (last["c"], "Sanyam %s bar" % last["source"],
+                            nsecal.to_ist(nsecal.utc_of(last["ts"])))
+                got = True
+        elif offline:
             p = os.path.join(offline, "chart-%s-1d-5m.json" % nsedata.to_yahoo(sym))
             if os.path.exists(p):
                 with open(p, encoding="utf-8") as fh:
@@ -261,7 +273,8 @@ def cmd_check(a):
     need = sorted({r["symbol"] for r in st["rules"]
                    if r["kind"] in ("above", "below") and not (r.get("fired_at") and r.get("once"))
                    and r["symbol"] not in manual})
-    prices = live_prices(need, a.cache, a.offline, a.pause) if need and not a.no_fetch else {}
+    prices = live_prices(need, a.cache, a.offline, a.pause, a.sanyam) \
+        if need and not a.no_fetch else {}
     for sym, px in manual.items():
         prices[sym] = (px, "given on the command line", now)
 
@@ -350,6 +363,8 @@ def main(argv=None):
     p.add_argument("--cache", default="trader/cache")
     p.add_argument("--pause", type=float, default=1.0)
     p.add_argument("--no-fetch", action="store_true", help="only --price and time alerts")
+    p.add_argument("--sanyam", nargs="?", const="", metavar="DB",
+                   help="take prices from Sanyam's candle store instead of Yahoo")
     p.add_argument("--offline", metavar="DIR")
     p.add_argument("--no-write", action="store_true")
     p.add_argument("--json", action="store_true")

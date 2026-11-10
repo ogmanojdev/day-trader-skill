@@ -91,11 +91,33 @@ reproduced exactly.
 
 ## Data
 
-Needs five-minute bars, which means Yahoo, which throttles by IP hard. Use
-`--offline` with saved charts for repeatable work. The bundled fixture is
-clearly marked synthetic in its own metadata and the tool prints a warning when
-it is reading one, because numbers from generated bars exercise the method and
+Needs sixty sessions of five-minute bars, which is more history than Yahoo will
+hand over without throttling. Three sources:
+
+```bash
+python3 timemachine.py run --sanyam ...          # Sanyam's store, best by a distance
+python3 timemachine.py run --offline DIR ...     # saved charts, reproducible
+python3 timemachine.py run ...                   # Yahoo, throttles
+```
+
+`--sanyam` is the right default here: the store already holds the broker's own
+bars with true extremes, and no network call means no 429 halfway through. The
+tool prints which source answered and warns if the bars are `LIVE_AGG`, whose
+intrabar highs and lows are approximate from a 1 Hz poll. That warning matters
+more here than anywhere else, because every outcome in this tool is decided on
+exactly those highs and lows.
+
+The bundled fixture is marked synthetic in its own metadata and the tool says so
+when reading one, because numbers from generated bars exercise the method and
 say nothing whatever about the symbol.
+
+### It refuses too little history
+
+Below `--min-sessions` (20) it stops rather than answering. This is not a
+precision quibble. Each slot's pool holds one bar shape per session, so with one
+session in the store every draw returns the same bar, and ten thousand trials
+are a single deterministic replay reported with the confidence of a simulation.
+Pass `--min-sessions 1` to override and read the output as the replay it is.
 
 **Not financial advice.** Most people who day trade lose money, and a
 favourable simulation does not change that. Nothing in this skill can place an

@@ -66,6 +66,13 @@ RELIANCE at 1,324.40 (settled close 2026-11-09)
 The second is a yesterday's number and the output says so. A stale price
 silently presented as live is how an alert system becomes actively harmful.
 
+`--sanyam` takes the price from Sanyam's candle store instead, which needs no
+network call and names the bar's source:
+
+```bash
+python3 alerts.py check --sanyam
+```
+
 `--price SYMBOL=PRICE` takes the number from your broker's terminal, which is
 the one you should trust anyway, and `--no-fetch` runs time alerts only.
 

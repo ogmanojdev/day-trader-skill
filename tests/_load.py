@@ -7,7 +7,7 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FIX = os.path.join(ROOT, "tests", "fixtures")
 SKILLS = ["nse-scanner", "nse-news", "nse-timemachine", "nse-alerts", "nse-analyst", "nse-deals"]
-COMMON = ["nsecal.py", "charges.py", "nsedata.py"]
+COMMON = ["nsecal.py", "charges.py", "nsedata.py", "sanyamstore.py"]
 
 
 def load(folder, name):

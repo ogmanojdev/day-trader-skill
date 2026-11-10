@@ -77,8 +77,47 @@ partial live tick, like 10:49:45), and a bar whose window has not closed yet.
 If the range itself has a gap the symbol is skipped, because the range is not
 knowable.
 
-`orb` reads Yahoo and therefore throttles. Keep `--max-charts` small and let
-`--pause` do its work.
+### Where the bars come from
+
+`orb` has three sources and they all go through the same grid checks, so the
+answer does not depend on which one replied:
+
+```bash
+python3 scan.py orb --sanyam                 # Sanyam's candle store, no network
+python3 scan.py orb --sanyam /path/to/db     # or point at it explicitly
+python3 scan.py orb                          # Yahoo, the fallback
+python3 scan.py orb --offline DIR            # saved charts
+```
+
+**Prefer `--sanyam`.** Yahoo is the only free source of NSE intraday bars and it
+throttles by IP hard: about a dozen chart calls in a burst earns a 429 on every
+endpoint for hours, which is long enough to miss the session you were trying to
+trade. Sanyam already holds the broker's own bars in SQLite, so there is no
+network call to throttle. Read-only, via `sqlite3`, so a running Sanyam is never
+blocked. On the real TCS session in the fixtures, Sanyam's HISTORY bars give a
+byte-identical opening range to the Yahoo chart.
+
+Sanyam stores `1m` as its base interval, so `5m` is derived when absent, on the
+IST grid.
+
+### One source of bars is refused on purpose
+
+Sanyam labels every bar with where it came from, and they are not equally
+trustworthy. `HISTORY` and `HISTORY_DB` are the broker's own bars with true
+extremes. `LIVE_AGG` is aggregated from a roughly 1 Hz last-traded-price poll,
+so it **misses true intrabar extremes**.
+
+That is fatal for an opening range specifically, because the range is the
+highest high and lowest low of the first three bars, not their closes. On that
+TCS session the 09:15 bar closed at 2456.70 and reached 2495.60: the high is 39
+rupees above the close. A once-a-second poll misses a spike like that, the range
+comes out **36% narrower**, and a close that is actually inside the real range
+reads as a breakout. So `LIVE_AGG` bars are refused with an explanation.
+`--allow-live-agg` overrides it if you know what you are accepting.
+
+When no store is available, `orb` falls back to Yahoo and fails fast on a
+throttle: one backoff and a clear message, not one per symbol. Keep
+`--max-charts` small and let `--pause` do its work.
 
 ## The calendar is the exchange's
 
