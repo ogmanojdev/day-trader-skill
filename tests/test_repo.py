@@ -3,18 +3,14 @@ import os
 import re
 import unittest
 
-from _load import ROOT
+from _load import COMMON, ROOT, SKILLS
 
-# v2, the day-trading pack: the eleven folders the reel's repo card shows
-SKILLS = ["trader-scanner", "trader-news", "trader-entry", "trader-exit", "trader-timemachine",
-          "trader-risk", "trader-budget", "trader-broker", "trader-alerts", "trader-analyst",
-          "trader-pelosi"]
-ABOUT = ("11 Claude skills for day trading: scan thousands of charts, track breaking news, time every "
-         "entry and exit, and replay every outcome before you risk a dollar.")
-# skills on the way to an order carry the safety block
-ORDER_PATH = ["trader-scanner", "trader-entry", "trader-exit", "trader-timemachine", "trader-budget",
-              "trader-pelosi", "trader-risk", "trader-broker", "trader-alerts"]
-V1_ONLY = ["trader-copycat", "trader-screener", "trader-tax", "trader-rebalance"]
+ABOUT = ("Six Claude skills for day trading Indian equities: scan the whole NSE cash market "
+         "from the exchange's own data, read the filing feed that moves a stock, replay a trade "
+         "before you risk a rupee, and see what it costs after STT.")
+# The five skills the original has that this pack deliberately does not: they live in
+# Sanyam's risk engine, and a second copy here would be a second risk path.
+IN_SANYAM = ["trader-risk", "trader-budget", "trader-broker", "trader-exit", "trader-entry"]
 
 
 def frontmatter(path):
@@ -26,23 +22,36 @@ def frontmatter(path):
 
 def every_text_file():
     for base, dirs, files in os.walk(ROOT):
-        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__")]
+        dirs[:] = [d for d in dirs if d not in (".git", "__pycache__", ".pytest_cache")]
         for f in files:
             if f.endswith((".md", ".py", ".json", ".csv", ".txt", ".xml")) or f == "LICENSE":
                 yield os.path.join(base, f)
 
 
-class Repo(unittest.TestCase):
-    def test_eleven_skill_folders_at_the_root(self):
+class Structure(unittest.TestCase):
+    def test_six_skill_folders_at_the_root(self):
         found = sorted(d for d in os.listdir(ROOT)
                        if os.path.isfile(os.path.join(ROOT, d, "SKILL.md")))
         self.assertEqual(found, sorted(SKILLS))
 
-    def test_root_matches_the_reel(self):
-        root = sorted(d for d in os.listdir(ROOT) if not d.startswith(".git"))
-        self.assertEqual(root, sorted([".claude-plugin", "LICENSE", "README.md", "tests"] + SKILLS))
+    def test_the_root_is_what_it_should_be(self):
+        root = sorted(d for d in os.listdir(ROOT)
+                      if not d.startswith(".git") and d not in (".pytest_cache", "trader"))
+        self.assertEqual(root, sorted([".claude-plugin", "LICENSE", "README.md",
+                                       "nse-common", "tests", "tools"] + SKILLS))
 
-    def test_frontmatter_name_and_description(self):
+    def test_no_us_skill_is_left_behind(self):
+        for d in os.listdir(ROOT):
+            self.assertFalse(d.startswith("trader-"), "%s is from the US pack" % d)
+
+    def test_nse_common_holds_the_canonical_modules(self):
+        have = sorted(f for f in os.listdir(os.path.join(ROOT, "nse-common"))
+                      if f.endswith(".py"))
+        self.assertEqual(have, sorted(COMMON))
+
+
+class Frontmatter(unittest.TestCase):
+    def test_name_and_a_real_description(self):
         for s in SKILLS:
             fm, text = frontmatter(os.path.join(ROOT, s, "SKILL.md"))
             self.assertIn("name: %s\n" % s, fm + "\n", s)
@@ -50,89 +59,111 @@ class Repo(unittest.TestCase):
             self.assertGreater(len(fm), 200, "%s description is too thin" % s)
             self.assertGreater(len(text.splitlines()), 60, s)
 
-    def test_order_path_skills_carry_the_safety_rule(self):
-        for s in ORDER_PATH:
-            _, text = frontmatter(os.path.join(ROOT, s, "SKILL.md"))
-            low = " ".join(text.lower().split())
-            self.assertIn("not financial advice", low, s)
-            self.assertIn("yes", low, s)
+    def test_a_description_says_nse_or_india_so_it_triggers_on_the_right_market(self):
+        for s in SKILLS:
+            fm, _t = frontmatter(os.path.join(ROOT, s, "SKILL.md"))
+            low = fm.lower()
+            self.assertTrue("nse" in low or "indian" in low or "india" in low, s)
 
-    def test_plugin_manifest_points_at_the_root_skills(self):
+    def test_every_skill_carries_the_safety_rule(self):
+        for s in SKILLS:
+            _fm, text = frontmatter(os.path.join(ROOT, s, "SKILL.md"))
+            low = " ".join(text.lower().split())
+            self.assertTrue("not financial advice" in low,
+                            "%s/SKILL.md is missing the advice disclaimer" % s)
+
+    def test_the_order_path_skills_say_no_order_without_a_yes(self):
+        for s in SKILLS:
+            _fm, text = frontmatter(os.path.join(ROOT, s, "SKILL.md"))
+            low = " ".join(text.lower().split())
+            if "place an order" in low:
+                self.assertTrue("typing yes" in low,
+                                "%s/SKILL.md mentions placing an order without saying that "
+                                "it takes a typed yes" % s)
+
+
+class Manifest(unittest.TestCase):
+    def test_plugin_points_at_the_root(self):
         with open(os.path.join(ROOT, ".claude-plugin", "plugin.json")) as fh:
             plugin = json.load(fh)
-        self.assertEqual(plugin["name"], "day-trader-skill")
+        self.assertEqual(plugin["name"], "nse-day-trader-skill")
         self.assertEqual(plugin["skills"], "./")
         self.assertEqual(plugin["description"], ABOUT)
+        self.assertEqual(plugin["license"], "MIT")
+
+    def test_marketplace_agrees_with_the_plugin(self):
         with open(os.path.join(ROOT, ".claude-plugin", "marketplace.json")) as fh:
             market = json.load(fh)
-        self.assertEqual(market["name"], "day-trader-skill")
-        self.assertEqual(market["plugins"][0]["name"], "day-trader-skill")
+        self.assertEqual(market["name"], "nse-day-trader-skill")
+        self.assertEqual(market["plugins"][0]["name"], "nse-day-trader-skill")
 
-    def test_readme_carries_the_reel_copy(self):
+    def test_the_licence_is_still_the_originals(self):
+        with open(os.path.join(ROOT, "LICENSE"), encoding="utf-8") as fh:
+            text = fh.read()
+        self.assertIn("MIT", text)
+
+
+class Readme(unittest.TestCase):
+    def setUp(self):
         with open(os.path.join(ROOT, "README.md"), encoding="utf-8") as fh:
-            readme = " ".join(fh.read().split())
-        self.assertTrue(readme.startswith("# The Day Trader skill"))
-        for line in (ABOUT,
-                     "https://github.com/Jakeschincariol/day-trader-skill install skill",
-                     "/plugin marketplace add Jakeschincariol/day-trader-skill",
-                     "/plugin install day-trader-skill@day-trader-skill",
-                     "## Fine print"):
-            self.assertIn(line, readme)
+            self.readme = " ".join(fh.read().split())
+
+    def test_it_opens_with_the_pack_and_carries_the_blurb(self):
+        self.assertTrue(self.readme.startswith("# The NSE Day Trader skill"))
+        self.assertIn(ABOUT, self.readme)
+
+    def test_every_skill_is_listed(self):
         for s in SKILLS:
-            self.assertIn("/" + s, readme, s)
+            self.assertIn("/" + s, self.readme, s)
 
-    def test_no_em_dashes_and_no_personal_email(self):
+    def test_it_credits_the_original_and_keeps_the_licence(self):
+        self.assertIn("Jakeschincariol/day-trader-skill", self.readme)
+        self.assertIn("MIT", self.readme)
+
+    def test_it_says_where_the_missing_five_went(self):
+        # A reader must not conclude the risk checks were dropped.
+        self.assertIn("Sanyam", self.readme)
+        for s in IN_SANYAM:
+            self.assertIn(s, self.readme, s)
+
+    def test_it_carries_the_fine_print(self):
+        for line in ("Not financial advice", "Nothing here can place an order",
+                     "A stop is a plan, not a guarantee"):
+            self.assertIn(line, self.readme, line)
+
+
+class House(unittest.TestCase):
+    def test_no_em_dashes_outside_the_fixtures(self):
         for path in every_text_file():
-            with open(path, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
             rel = os.path.relpath(path, ROOT)
-            if not rel.startswith(os.path.join("tests", "fixtures")):  # fixtures are real data, kept as published
-                self.assertNotIn("\u2014", text, rel)
-            self.assertNotIn("jakeschincariol" + "@" + "gmail.com", text, rel)  # built, so this file passes too
-
-    def test_no_v1_only_skill_is_left_behind(self):
-        for path in every_text_file():
-            rel = os.path.relpath(path, ROOT)
-            if rel.startswith("tests" + os.sep) or rel == "README.md":
-                continue  # the README points v1 users to the v1 commit
+            if rel.startswith(os.path.join("tests", "fixtures")):
+                continue        # real published data, kept exactly as the exchange wrote it
             with open(path, encoding="utf-8", errors="replace") as fh:
-                text = fh.read()
-            for old in V1_ONLY:
-                self.assertNotIn(old, text, rel)
+                # built, not written, so this file passes its own check
+                self.assertNotIn("\u2014", fh.read(), rel)
 
-    def test_every_tool_runs_on_python_3_8(self):
-        # no 3.9+ only modules or syntax in the tools (the README promises 3.8)
-        for s in SKILLS:
-            folder = os.path.join(ROOT, s)
-            for f in os.listdir(folder):
-                if not f.endswith(".py"):
-                    continue
-                with open(os.path.join(folder, f), encoding="utf-8") as fh:
-                    src = fh.read()
-                for bad in ("import zoneinfo", "from zoneinfo", ".removeprefix(", ".removesuffix(",
-                            "match ", "list[", "dict[", "tuple["):
-                    if bad == "match ":
-                        self.assertNotRegex(src, r"(?m)^\s+match \w+.*:$", "%s/%s" % (s, f))
-                    elif bad.endswith("["):
-                        self.assertNotRegex(src, r"(?<![\w.])%s" % re.escape(bad), "%s/%s" % (s, f))
-                    else:
-                        self.assertNotIn(bad, src, "%s/%s" % (s, f))
-
-    def test_day_trading_limits_ship_in_the_example_config(self):
-        with open(os.path.join(ROOT, "trader-budget", "config.example.json")) as fh:
+    def test_the_config_example_is_paper_first_and_cost_aware(self):
+        with open(os.path.join(ROOT, "nse-common", "config.example.json")) as fh:
             cfg = json.load(fh)
-        for k in ("max_loss_per_trade_usd", "max_daily_loss_usd", "max_trades_per_day",
-                  "min_reward_risk", "require_stop", "no_entries_after", "flat_by"):
-            self.assertIn(k, cfg, k)
+        self.assertIs(cfg["paper"], True)
         self.assertIs(cfg["require_stop"], True)
         self.assertIs(cfg.get("allow_short", False), False)
         self.assertIs(cfg.get("allow_margin", False), False)
-
-    def test_paper_trading_is_the_default(self):
-        with open(os.path.join(ROOT, "trader-budget", "config.example.json")) as fh:
-            cfg = json.load(fh)
-        self.assertIs(cfg["paper"], True)
         self.assertIs(cfg.get("allow_options", False), False)
+        self.assertEqual(cfg["flat_by"], "15:15")
+        # 1.0 would be a losing rule once Indian costs land, so the default is above it
+        self.assertGreater(cfg["min_reward_risk"], 1.0)
+        self.assertIn("charges", cfg)
+
+    def test_every_tool_takes_offline_so_the_suite_never_needs_the_network(self):
+        for skill in SKILLS:
+            folder = os.path.join(ROOT, skill)
+            tools = [f for f in os.listdir(folder)
+                     if f.endswith(".py") and f not in COMMON]
+            self.assertTrue(tools, skill)
+            for f in tools:
+                with open(os.path.join(folder, f), encoding="utf-8") as fh:
+                    self.assertIn("--offline", fh.read(), "%s/%s" % (skill, f))
 
 
 if __name__ == "__main__":

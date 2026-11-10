@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Everything the tools write at run time: the universe, the watchlist, plans,
+# alerts, the bhavcopy cache. Local state, not source.
+trader/
