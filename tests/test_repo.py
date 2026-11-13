@@ -37,8 +37,8 @@ class Structure(unittest.TestCase):
     def test_the_root_is_what_it_should_be(self):
         root = sorted(d for d in os.listdir(ROOT)
                       if not d.startswith(".git") and d not in (".pytest_cache", "trader"))
-        self.assertEqual(root, sorted([".claude-plugin", "LICENSE", "README.md",
-                                       "nse-common", "tests", "tools"] + SKILLS))
+        self.assertEqual(root, sorted([".claude-plugin", "CONTRIBUTING.md", "LICENSE",
+                                       "README.md", "nse-common", "tests", "tools"] + SKILLS))
 
     def test_no_us_skill_is_left_behind(self):
         for d in os.listdir(ROOT):
