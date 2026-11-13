@@ -112,6 +112,34 @@ class Store(unittest.TestCase):
         self.assertEqual(rc, 1)
         self.assertIn("nothing to add", err)
 
+    def test_above_and_below_together_add_both(self):
+        """A stop and a target in one command. Keeping only one of them would arm
+        the target and leave the position unstopped, without saying so."""
+        rc, out, _e = self.run_it(["add", "--symbol", "RELIANCE",
+                                   "--above", "1345", "--below", "1330"])
+        self.assertEqual(rc, 0)
+        with open(self.store) as fh:
+            rules = json.load(fh)["rules"]
+        self.assertEqual(len(rules), 2)
+        self.assertEqual({r["kind"] for r in rules}, {"above", "below"})
+        self.assertEqual({r["value"] for r in rules}, {1345.0, 1330.0})
+        self.assertEqual(len({r["id"] for r in rules}), 2)   # ids must not collide
+        self.assertIn("1,345.00", out)
+        self.assertIn("1,330.00", out)
+
+    def test_square_off_without_a_time_says_so(self):
+        rc, _o, err = self.run_it(["add", "--symbol", "RELIANCE", "--square-off"])
+        self.assertEqual(rc, 1)
+        self.assertIn("--at", err)
+        self.assertNotIn("nothing to add", err)
+
+    def test_square_off_with_a_time_marks_the_rule(self):
+        rc, _o, _e = self.run_it(["add", "--at", "15:15", "--square-off"])
+        self.assertEqual(rc, 0)
+        with open(self.store) as fh:
+            rules = json.load(fh)["rules"]
+        self.assertTrue(any(r.get("square_off") for r in rules))
+
 
 if __name__ == "__main__":
     unittest.main()

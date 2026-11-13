@@ -211,16 +211,25 @@ def cmd_add(a):
             added.append({"id": next_id(st), "kind": "at_time", "value": a.at,
                           "label": a.label or "time", "square_off": bool(a.square_off),
                           "once": not a.repeat})
+            st["rules"].append(added[-1])
         elif a.above is not None or a.below is not None:
             if not a.symbol:
                 raise AlertError("a price alert needs --symbol")
-            kind = "above" if a.above is not None else "below"
-            added.append({"id": next_id(st), "kind": kind, "symbol": a.symbol.upper(),
-                          "value": a.above if a.above is not None else a.below,
-                          "label": a.label or kind, "once": not a.repeat})
+            # Both at once is the ordinary case: a target above and a stop below the
+            # same position. Each becomes its own rule, so neither is silently dropped.
+            for kind, value in (("above", a.above), ("below", a.below)):
+                if value is None:
+                    continue
+                added.append({"id": next_id(st), "kind": kind, "symbol": a.symbol.upper(),
+                              "value": value, "label": a.label or kind,
+                              "once": not a.repeat})
+                st["rules"].append(added[-1])   # before the next next_id, or the ids collide
+        elif a.square_off:
+            raise AlertError("--square-off marks a time alert, so it needs a time: pass it "
+                             "with --at HH:MM, or use --from-plan, which adds the %s IST "
+                             "square-off for you." % nsecal.SQUARE_OFF.strftime("%H:%M"))
         else:
             raise AlertError("nothing to add. Use --from-plan, or --above/--below, or --at.")
-        st["rules"].extend(added)
     save(a.store, st)
     for r in added:
         print("added %s: %s" % (r["id"], describe(r)))

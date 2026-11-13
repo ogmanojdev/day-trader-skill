@@ -127,6 +127,34 @@ def aggregate(deals):
     return out
 
 
+def deal_lines(x):
+    """The rows printed for one client's position in one symbol.
+
+    Shares and cash carry their own signs and can disagree: a market maker who buys
+    and sells the same size all day ends a few shares long while taking cash out.
+    Reporting the share sign alone turned that round trip into a "buy", which is the
+    opposite of what the position says.
+    """
+    gross = max(x["buy_qty"], x["sell_qty"])
+    both = x["buy_qty"] > 0 and x["sell_qty"] > 0
+    crossed = both and abs(x["net_qty"]) <= 0.1 * gross
+    arrow = "crossed" if (crossed or x["net_qty"] == 0) else (
+        "bought" if x["net_qty"] > 0 else "sold")
+    cash = x["net_value_lacs"]
+    word = "paid" if cash > 0 else ("received" if cash < 0 else "flat")
+    rows = ["  %-13s %-42s %-7s %12s shares  %s %s"
+            % (x["symbol"], x["client"][:42], arrow,
+               charges.indian_group(abs(x["net_qty"])),
+               word, charges.inr(abs(cash) * 100000, paise=False))]
+    if both:
+        rows.append("                bought %s, sold %s: %s of the larger side kept"
+                    % (charges.indian_group(x["buy_qty"]), charges.indian_group(x["sell_qty"]),
+                       ("%.1f%%" % (100.0 * abs(x["net_qty"]) / gross)) if gross else "0%"))
+    rows.append("                %s%s" % (",".join(x["kinds"]),
+                                          ("  " + ", ".join(x["dates"])) if x["dates"] else ""))
+    return rows
+
+
 def cmd_deals(a):
     deals = fetch_deals(a.offline)
     if not deals:
@@ -153,15 +181,10 @@ def cmd_deals(a):
         return 0
     print("Bulk and block deals%s: %d prints, %d client positions."
           % ((" for " + ", ".join(days)) if days else "", len(deals), len(agg)))
-    print("Value is in lakh of rupees, as the exchange publishes it.\n")
+    print("Figures in rupees. The exchange publishes value in lakh.\n")
     for x in agg[:a.show]:
-        arrow = "bought" if x["net_qty"] > 0 else ("sold" if x["net_qty"] < 0 else "crossed")
-        print("  %-13s %-42s %-7s %12s shares  %s"
-              % (x["symbol"], x["client"][:42], arrow,
-                 charges.indian_group(abs(x["net_qty"])),
-                 charges.inr(abs(x["net_value_lacs"]) * 100000, paise=False)))
-        print("                %s%s" % (",".join(x["kinds"]),
-                                        ("  " + ", ".join(x["dates"])) if x["dates"] else ""))
+        for line in deal_lines(x):
+            print(line)
     if len(agg) > a.show:
         print("  ... and %d more" % (len(agg) - a.show))
     if not a.no_write:

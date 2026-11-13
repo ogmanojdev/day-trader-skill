@@ -83,6 +83,25 @@ class EndToEnd(unittest.TestCase):
         self.assertIn("Bulk and block deals", out)
         self.assertIn("lakh", out)
 
+    def test_a_round_trip_is_not_reported_as_a_buy(self):
+        """A market maker who buys and sells the same size ends a few shares long
+        while taking cash out. Printing the share sign alone called that a buy."""
+        raw = [{"symbol": "X", "client": "HFT", "side": "BUY", "quantity": 5323230,
+                "price": 702.19, "value_lacs": 37379.19, "kind": "bulk",
+                "date": "2026-11-12"},
+               {"symbol": "X", "client": "HFT", "side": "SELL", "quantity": 5321168,
+                "price": 702.81, "value_lacs": 37397.70, "kind": "bulk",
+                "date": "2026-11-12"}]
+        agg = deals.aggregate(raw)
+        self.assertEqual(agg[0]["net_qty"], 2062)
+        self.assertLess(agg[0]["net_value_lacs"], 0)       # cash came out, not in
+        rows = deals.deal_lines(agg[0])
+        self.assertIn("crossed", rows[0])
+        self.assertIn("received", rows[0])
+        self.assertNotIn("bought", rows[0])                # the headline must not say buy
+        self.assertIn("53,23,230", rows[1])                # the gross size is shown
+        self.assertIn("53,21,168", rows[1])
+
     def test_a_symbol_filter_works(self):
         buf, err = io.StringIO(), io.StringIO()
         with redirect_stdout(buf), redirect_stderr(err):
