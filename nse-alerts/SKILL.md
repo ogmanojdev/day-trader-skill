@@ -13,6 +13,7 @@ flat before someone else does it for you.
 ```bash
 python3 alerts.py add --from-plan                      # all three at once
 python3 alerts.py add --symbol RELIANCE --below 1318.5 --label "stop"
+python3 alerts.py add --symbol RELIANCE --above 1330.3 --below 1318.5   # both at once
 python3 alerts.py add --at 15:15 --label "square off" --square-off
 python3 alerts.py list
 python3 alerts.py check                                # rings what hit, once

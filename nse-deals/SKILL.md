@@ -54,6 +54,21 @@ once as a sell. Here two entities of the same family moved 60 lakh shares
 between themselves. Nothing was accumulated and nobody formed a view: it is a
 restructuring. Read either line alone and it looks like conviction.
 
+One party can also cross with itself. A high-frequency firm may buy and sell
+the same size all day and end a few shares long, which crosses the 0.5%
+disclosure threshold on churn rather than conviction:
+
+```
+KALYANKJIL  GRAVITON RESEARCH CAPITAL LLP  crossed  2,062 shares  received 18,51,000
+            bought 53,23,230, sold 53,21,168: 0.0% of the larger side kept
+```
+
+Net shares and net cash point opposite ways there: a few shares long, and cash
+taken out. So the headline says `crossed`, not `bought`, the cash is labelled
+`paid` or `received` rather than left unsigned, and the gross of both sides is
+printed underneath. Three-quarters of a thousand crore moved and nobody's
+ownership changed.
+
 A genuine signal looks different: one named institution on the buy side, no
 matching seller of the same size, repeated across sessions.
 
