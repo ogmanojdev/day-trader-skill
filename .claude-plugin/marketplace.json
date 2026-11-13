@@ -1,5 +1,6 @@
 {
   "name": "nse-day-trader-skill",
+  "description": "Six skills for day trading Indian equities on NSE, built on the exchange's own data: whole-market scanning, the corporate filing feed, cost-aware trade replay net of STT, and the 15:15 IST square-off.",
   "owner": {
     "name": "Manoj Dev"
   },
