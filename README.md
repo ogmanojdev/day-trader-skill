@@ -16,15 +16,35 @@ Free, MIT, no signup, no API key. Standard-library Python, 3.8 or newer.
 
 ## Install
 
-```bash
-git clone https://github.com/ogmanojdev/day-trader-skill.git
-cp -r day-trader-skill/nse-* ~/.claude/skills/
+In Claude Code, one line installs all six and keeps them updated:
+
+```
+/plugin install nse-day-trader-skill --marketplace ogmanojdev/nse-trader-skill
 ```
 
-Project-local instead of global: copy the same folders into your repo's
-`.claude/skills/`. Each folder stands alone, so one skill can be copied without
-the others. No Claude Code at all? Paste any single `SKILL.md` at the top of a
-chat and it runs as a mode; you lose the Python tools and keep the method.
+That needs Claude Code 2.1.275 or later. On an older build, add the marketplace
+first and then install from it:
+
+```
+/plugin marketplace add ogmanojdev/nse-trader-skill
+/plugin install nse-day-trader-skill
+```
+
+`/plugin` lists what you have, enables and disables a plugin, and uninstalls it
+again. Updates arrive with the repo.
+
+Copying the folders by hand still works, and is the way to take one skill
+without the rest:
+
+```bash
+git clone https://github.com/ogmanojdev/nse-trader-skill.git
+cp -r nse-trader-skill/nse-* ~/.claude/skills/
+```
+
+Each folder stands alone and vendors what it needs, so a single `nse-scanner`
+copies cleanly. Project-local instead of global: copy into your repo's
+`.claude/skills/`. No Claude Code at all? Paste any single `SKILL.md` at the top
+of a chat and it runs as a mode; you lose the Python tools and keep the method.
 
 ## The six
 
