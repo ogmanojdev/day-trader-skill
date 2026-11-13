@@ -1,0 +1,68 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  unittest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # The README promises 3.8 or newer. Test the ends of that range.
+        python-version: ["3.8", "3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run the suite
+        # No dependencies by design, and every test reads a captured fixture,
+        # so this needs no network and no install step.
+        run: python -m unittest discover -s tests -v
+
+  vendored-copies-match:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Re-vendor and fail if anything changed
+        # Each skill folder carries its own copy of the nse-common modules so a
+        # single folder can be copied out and still work. This catches a commit
+        # that edited a copy instead of the source.
+        run: |
+          python tools/vendor.py
+          git diff --exit-code || {
+            echo "::error::Vendored copies are stale. Edit nse-common/, then run tools/vendor.py"
+            exit 1
+          }
+
+  plugin-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate the plugin and marketplace manifests
+        run: |
+          python3 - <<'PY'
+          import json, sys, pathlib
+          root = pathlib.Path(".")
+          plugin = json.loads((root / ".claude-plugin/plugin.json").read_text())
+          market = json.loads((root / ".claude-plugin/marketplace.json").read_text())
+          fail = []
+          for key in ("name", "version", "description", "author"):
+              if not plugin.get(key):
+                  fail.append("plugin.json is missing %s" % key)
+          skills = sorted(p.name for p in root.glob("nse-*") if (p / "SKILL.md").exists())
+          if len(skills) != 6:
+              fail.append("expected 6 skills with a SKILL.md, found %d: %s" % (len(skills), skills))
+          if not market.get("plugins"):
+              fail.append("marketplace.json lists no plugins")
+          if fail:
+              print("\n".join("::error::" + f for f in fail))
+              sys.exit(1)
+          print("manifests ok: %s %s, skills: %s" % (plugin["name"], plugin["version"], ", ".join(skills)))
+          PY
