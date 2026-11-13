@@ -59,7 +59,7 @@ of a chat and it runs as a mode; you lose the Python tools and keep the method.
 
 Five of the original eleven are deliberately absent. `trader-risk`,
 `trader-budget`, `trader-broker`, `trader-exit` and `trader-entry` are already
-implemented, better and in one place, inside [Sanyam](https://github.com/ogmanojdev/sanyam):
+implemented, better and in one place, inside [Sanyam](https://sanyam.app):
 a risk engine with a kill switch and a cooling-off lock that no order can
 bypass, protective stops, paper execution, Zerodha and Upstox adapters, and an
 opening-range strategy. Porting them would have built a second, weaker risk

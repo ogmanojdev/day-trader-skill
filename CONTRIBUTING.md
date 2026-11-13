@@ -12,7 +12,7 @@ rules shape almost every decision here:
    exchange. No vendor data, no estimates, no "approximately". If a figure
    cannot be traced, it does not get printed.
 2. **Nothing places an order.** These are research tools. The risk engine and
-   broker adapters live in [Sanyam](https://github.com/ogmanojdev/sanyam), where
+   broker adapters live in [Sanyam](https://sanyam.app), where
    there is exactly one unbypassable risk path. A pull request that adds an
    order path here will be declined, however well written.
 
