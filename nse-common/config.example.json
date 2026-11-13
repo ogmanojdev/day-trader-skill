@@ -1,0 +1,35 @@
+{
+  "_about": "Copy to trader/config.json. Every number here is yours to change.",
+
+  "capital_inr": 200000,
+  "risk_per_trade_pct": 0.5,
+  "daily_loss_cap_pct": 2.0,
+  "max_trades_per_day": 4,
+  "min_reward_risk": 1.5,
+  "require_stop": true,
+  "no_entries_after": "14:30",
+  "flat_by": "15:15",
+
+  "paper": true,
+  "allow_short": false,
+  "allow_options": false,
+  "allow_margin": false,
+
+  "_min_reward_risk_note": "1.5 and not 1.0 on purpose. A 1.0 gross reward-to-risk is about 0.72 after Indian intraday costs on a typical position, so a 1R target is a losing trade before it starts. Run nse-timemachine to see the net number for your own size.",
+  "_flat_by_note": "15:15, not the 15:30 close: brokers square off MIS positions themselves at about 15:20 at market.",
+
+  "charges": {
+    "_about": "Rates as published by NSE and a discount broker's calculator, read 2026-11-10. They move with exchange and government circulars. Verify against a real contract note before trusting a number to the rupee. Anything left out here falls back to the defaults in charges.py.",
+    "all": {},
+    "equity_intraday": {
+      "brokerage": {"pct": "0.03", "cap": "20", "flat": null}
+    },
+    "equity_delivery": {
+      "brokerage": {"pct": "0", "cap": "0", "flat": "0"},
+      "dp_per_sell": "15.34"
+    },
+    "options": {
+      "brokerage": {"pct": "0", "cap": null, "flat": "20"}
+    }
+  }
+}

@@ -1,216 +1,233 @@
-# The Day Trader skill
+# The NSE Day Trader skill
 
-11 Claude skills for day trading: scan thousands of charts, track breaking news, time every entry and exit, and replay every outcome before you risk a dollar.
+Six Claude skills for day trading Indian equities: scan the whole NSE cash
+market from the exchange's own data, read the filing feed that moves a stock,
+replay a trade before you risk a rupee, and see what it costs after STT.
 
-Free, MIT, no signup, no API key. The tools are plain Python that read free
-public data: Yahoo Finance charts, Nasdaq Trader's symbol lists, SEC EDGAR
-and the House Clerk.
+An adaptation of [the Day Trader skill](https://github.com/Jakeschincariol/day-trader-skill)
+for NSE. The original is excellent and entirely US-shaped: a New York clock
+with daylight saving, Nasdaq Trader's symbol lists, SEC EDGAR, the House Clerk,
+a 15:55 flat-by, the pattern-day-trader rule, and targets computed as "1R"
+because a US equity trade is close to free. None of that is true here, and the
+last one is not a detail. It is the difference between a winning rule and a
+losing one.
 
-One scans thousands of charts for setups. Another tracks breaking news on
-every stock you watch. One watches a setup bar by bar and tells you the moment
-to get in, and another sets your stop and your target before you do. And the
-craziest one is the Time Machine: before you risk a dollar, it replays the
-rest of the session 10,000 times from the stock's own recent bars, plus every
-past day the same setup fired, and tells you the honest odds.
-
-And no trade goes through until you say yes. Nothing in this pack can place
-an order on its own. Paper trading is the default.
-
-> **Looking for the original Trader skill?** Copy an investor's 13F, the
-> stock screener, tax lots and rebalancing live in
-> [github.com/Jakeschincariol/trader-skill](https://github.com/Jakeschincariol/trader-skill).
-> This repo is its day-trading sequel: the Trader skill v2.
+Free, MIT, no signup, no API key. Standard-library Python, 3.8 or newer.
 
 ## Install
 
-Paste this into Claude:
+In Claude Code, one line installs all six and keeps them updated:
 
 ```
-https://github.com/Jakeschincariol/day-trader-skill
-
-install skill
+/plugin install nse-day-trader-skill --marketplace ogmanojdev/nse-trader-skill
 ```
 
-Or as a plugin, in Claude Code:
+That needs Claude Code 2.1.275 or later. On an older build, add the marketplace
+first and then install from it:
 
 ```
-/plugin marketplace add Jakeschincariol/day-trader-skill
-/plugin install day-trader-skill@day-trader-skill
+/plugin marketplace add ogmanojdev/nse-trader-skill
+/plugin install nse-day-trader-skill
 ```
 
-Claude Code namespaces plugin skills, so installed as a plugin they show up as
-`/day-trader-skill:trader-scanner` and so on. Copy the folders instead if you want
-plain `/trader-scanner`:
+`/plugin` lists what you have, enables and disables a plugin, and uninstalls it
+again. Updates arrive with the repo.
+
+Copying the folders by hand still works, and is the way to take one skill
+without the rest:
 
 ```bash
-git clone https://github.com/Jakeschincariol/day-trader-skill.git
-cp -r day-trader-skill/trader-* ~/.claude/skills/
+git clone https://github.com/ogmanojdev/nse-trader-skill.git
+cp -r nse-trader-skill/nse-* ~/.claude/skills/
 ```
 
-Project-local instead of global: copy the same folders into your repo's
-`.claude/skills/`. No Claude Code at all? Paste any single `SKILL.md` at the
-top of a chat and it runs as a mode. You lose the Python tools, but the method
-works.
+Each folder stands alone and vendors what it needs, so a single `nse-scanner`
+copies cleanly. Project-local instead of global: copy into your repo's
+`.claude/skills/`. No Claude Code at all? Paste any single `SKILL.md` at the top
+of a chat and it runs as a mode; you lose the Python tools and keep the method.
 
-The tools need Python 3.8 or newer. Nothing to pip install. The SEC tools
-(news filings, the analyst) ask you to identify yourself: put your name and
-email in `trader/config.json` (`"sec_user_agent": "Your Name you@example.com"`)
-or in the `SEC_USER_AGENT` environment variable.
-
-## The eleven
+## The six
 
 | command | job | what it does |
 | --- | --- | --- |
-| `/trader-scanner` | Chart Scanner | Scans thousands of charts for setups: opening-range breakouts, flags, oversold bounces. |
-| `/trader-news` | News Monitor | Tracks breaking news on every stock you watch and flags what moves it. |
-| `/trader-entry` | Entry Timer | Watches a setup bar by bar and tells you the moment to get in. |
-| `/trader-exit` | Exit Planner | Sets your stop and your target before you enter, so you know when to get out. |
-| `/trader-timemachine` | Time Machine | Replays every possible outcome of a trade before you risk a dollar: 10,000 simulated sessions plus every past time the setup fired. |
-| `/trader-risk` | Risk Manager | Checks every trade against your limits and stops anything over them. |
-| `/trader-budget` | Budget Manager | Sizes every position to your budget and your max loss per trade. |
-| `/trader-broker` | Order Executor | Sends approved orders to your broker, paper trading by default, never without your yes. |
-| `/trader-alerts` | Price Alerts | Rings when a price, a stop or the opening bell hits. |
-| `/trader-analyst` | Earnings Analyst | Reads earnings reports and sums up what changed. |
-| `/trader-pelosi` | Pelosi Tracker | Reads Congress's stock-trade disclosures the minute they are filed. |
+| `/nse-scanner` | Chart Scanner | Scans ~2,400 EQ names from one bhavcopy request, including delivery-percentage surges, and refuses band-locked and ASM names. |
+| `/nse-news` | News Monitor | The exchange filing feed plus India-localised press, tagged by what this market reacts to, timed in IST. |
+| `/nse-timemachine` | Time Machine | Replays the rest of the session 10,000 times from the symbol's own bars, and tells you the odds after costs. |
+| `/nse-alerts` | Price Alerts | Stop, target, and the 15:15 square-off before your broker does it for you. |
+| `/nse-analyst` | Earnings Analyst | Filed quarterly results in crore, basis kept separate, results calendar from board-meeting intimations. |
+| `/nse-deals` | Deals Tracker | Who bought, by name: bulk and block deals daily, plus SEBI insider filings. |
 
-## How to use it
+Five of the original eleven are deliberately absent. `trader-risk`,
+`trader-budget`, `trader-broker`, `trader-exit` and `trader-entry` are already
+implemented, better and in one place, inside [Sanyam](https://github.com/ogmanojdev/sanyam):
+a risk engine with a kill switch and a cooling-off lock that no order can
+bypass, protective stops, paper execution, Zerodha and Upstox adapters, and an
+opening-range strategy. Porting them would have built a second, weaker risk
+path beside the one that was made unbypassable on purpose. These six are the
+research surface that feeds it; none of them can place an order.
 
-Everything lands in a `trader/` folder in your project, and each skill reads
-what the last one wrote:
+`trader-pelosi` has no Indian counterpart at all: there is no STOCK Act, no
+register of politicians' trades. `nse-deals` replaces it with something better
+for a trader, because bulk and block deals are published daily rather than six
+weeks late and they name the buyer.
+
+## What actually had to change
+
+**Costs, and this is the big one.** An Indian intraday round trip pays STT on
+the sell leg, stamp duty on the buy leg, an exchange transaction charge, a SEBI
+turnover fee, an investor-protection fee, brokerage, and 18% GST on several of
+those. So:
 
 ```
-scanner -> news -> entry -> exit -> timemachine -> budget -> risk -> broker   (one trade)
-alerts: stop, target, flat by the close                                       (while it is open)
-news / analyst / pelosi                                                        (on a schedule)
+100 shares at 1,324.40, stop 1,318.50, target 1,330.30
+reward:risk   1.00 gross,  0.72 after costs
+breakeven     0.94 a share, which is 16% of the risk
+expectancy    +4.54 gross,  -89.64 net
 ```
 
-An example, the trade in the reel: Tesla, Monday October 19 2026, real data.
+A 1:1 coin flip is not marginal here. It is a reliable loser. The original's
+`1R` default is wrong in India in a way that no amount of discipline fixes, and
+`nse-common/charges.py` is the module that says so in rupees. Sanyam's
+backtester documents the same hole at `backend/app/backtest/engine.py:22`
+("no-costs"), which this closes in one place both can import.
 
-1. **`/trader-scanner`** at 10:15 AM ET: of the 231 charts in the reel's
-   scan, 42 had closed above their 15-minute opening range. TSLA is one: range 354.47 to 362.18,
-   the 10:10 candle closed at 364.18, 0.55 % over the top.
-2. **`/trader-news`**: the morning's TSLA headlines, in New York time
-   ("Tesla-SpaceX Merger Mania Strikes Wall Street Ahead of Earnings", 8:04,
-   tagged earnings and deal). Tesla reports this week: a day trade is out
-   before the close, so it is not exposed to the report.
-3. **`/trader-entry`** watched TSLA bar by bar. At 10:12 it said waiting (the
-   10:10 bar was still forming). At 10:15 it said triggered: the first
-   5-minute close above the range, 364.18.
-4. **`/trader-exit`** set the plan before the entry: stop at the range's
-   midpoint, 358.32, so 5.86 a share at risk; target one times that risk,
-   370.04; flat by 3:55 PM either way.
-5. **`/trader-timemachine`** replayed the rest of the day 10,000 times, each
-   5-minute candle drawn from TSLA's own candles at that time of day over the
-   previous 59 sessions (seed 19, so anyone can repeat it): target first
-   29.4 %, stop first 25.5 %, still open at the close 45.1 %. It also re-ran
-   the same rule on those 59 real sessions: it fired 33 times, 13 hit the
-   target, 15 the stop, 5 neither. Its verdict: close to a coin flip. That is
-   the point of looking before you risk a dollar.
-6. **`/trader-budget`** with a $5,000 account and a $50 max loss per trade:
-   50 / 5.86 = 8 shares ($2,913.44). If the stop fills at 358.32, the loss is
-   $46.88. It writes one bracket order: buy 8 TSLA, stop-loss 358.32,
-   take-profit 370.04.
-7. **`/trader-risk`** checks it against your limits: the max loss, the daily
-   loss limit, trades per day, reward to risk, the entry window, position
-   size and cash. PASS or BLOCK, with the reason.
-8. **`/trader-broker`** shows you the ticket in plain words. You type yes for
-   that exact order. Claude calls your brokerage connector (Alpaca's MCP
-   server, paper account by default), and Claude's own "Allow once / Deny"
-   card asks you one more time.
-9. **`/trader-alerts`** rings on the stop, the target and at 3:55 PM to
-   flatten whatever is still open.
+**The clock.** 09:15 to 15:30 IST, 375 minutes, exactly 75 five-minute bars.
+India has no daylight saving, so the original's nth-Sunday apparatus (copied
+into nine files, two of which had already drifted) collapses to one constant.
+Square-off is **15:15**, not 15:55, because brokers flatten MIS positions
+themselves at about 15:20 at market.
+
+**The calendar.** The exchange's own holiday list, including the case the US
+has no shape for: Diwali Muhurat trading, an hour-long session on a day the
+market is otherwise shut, which in 2026 fell on a Sunday. The table is dated
+and ends where NSE's published list ends; past that, dates are reported unknown
+rather than guessed.
+
+**Intraday bars come from Sanyam, not Yahoo.** `nse-common/sanyamstore.py`
+reads Sanyam's candle store directly with `sqlite3`, read-only, so `orb`, the
+Time Machine and alerts need no network call at all. Yahoo stays as the
+fallback. It matters because Yahoo throttles by IP for hours after a dozen
+calls, long enough to miss the session. Sanyam's `HISTORY` bars give a
+byte-identical opening range to the Yahoo chart for the same session.
+
+`LIVE_AGG` bars are refused for an opening range. They are aggregated from a
+roughly 1 Hz price poll and miss intrabar extremes, and the range is built from
+highs and lows: on the TCS session in the fixtures that makes the range 36%
+narrower and turns a close inside the real range into a breakout.
+
+**The data.** `EQUITY_L.csv` for the universe, `sec_bhavdata_full` for the
+whole market's settled prices in one request, `sec_list.csv` for price bands,
+`reportASM` for surveillance, `bulk.csv` and `block.csv` for deals,
+`top-corp-info` for results, the corporate-announcements feed for filings, and
+Yahoo only where intraday bars are unavoidable.
+
+**Things with no US analogue.** Price bands, where a stop beyond the band is
+not a wide stop but an order that cannot execute. ASM and trade-for-trade
+series, where there is no intraday trade to be had. Delivery percentage, which
+separates a breakout being bought from one being churned. Lot sizes. And no
+pattern-day-trader rule, so that guard is simply gone.
 
 ## The tools
 
-All standard-library Python. The data tools read public endpoints and are
-polite about it.
-
 ```bash
-python3 trader-scanner/scan.py universe                                # ~5,900 US stocks, Nasdaq Trader
-python3 trader-scanner/scan.py daily                                   # pre-market setups, whole universe
-python3 trader-scanner/scan.py orb --at 10:15                          # opening-range breakouts so far
-python3 trader-news/news.py --tickers TSLA --hours 12                  # headlines, 8-Ks, today's move
-python3 trader-entry/entry.py check TSLA --setup orb                   # waiting / triggered / expired
-python3 trader-entry/entry.py watch TSLA --every 30                    # bar by bar until it triggers
-python3 trader-exit/exit.py plan --stop or-mid --target 1R --write     # -> trader/plan.json
-python3 trader-timemachine/timemachine.py run --write                  # 10,000 replays + the history
-python3 trader-budget/size.py --write                                  # -> trader/orders.json
-python3 trader-risk/check.py                                           # PASS / BLOCK per order
-python3 trader-broker/ticket.py show                                   # the tickets, READY or not
-python3 trader-alerts/alerts.py add --from-plan                        # stop, target, flat by close
-python3 trader-alerts/alerts.py check                                  # rings what hit, once
-python3 trader-analyst/facts.py TSLA                                   # quarters, growth, EPS
-python3 trader-pelosi/ptr.py index --member pelosi                     # her PTRs this year
+python3 nse-scanner/scan.py universe                      # EQUITY_L.csv -> trader/universe.txt
+python3 nse-scanner/scan.py daily                         # whole market -> trader/watchlist.json
+python3 nse-scanner/scan.py orb --sanyam --at 10:00       # bars from Sanyam, no network
+python3 nse-scanner/scan.py bands                         # price bands + ASM
+python3 nse-news/news.py --symbols RELIANCE --hours 12
+python3 nse-news/news.py announcements --hours 24
+python3 nse-timemachine/timemachine.py run --plan trader/plan.json --sanyam
+python3 nse-alerts/alerts.py add --from-plan
+python3 nse-alerts/alerts.py check
+python3 nse-analyst/facts.py RELIANCE
+python3 nse-analyst/facts.py --calendar --back 5
+python3 nse-deals/deals.py
+python3 nse-deals/deals.py insider --days 30
 ```
 
+Shared code lives in `nse-common/` (the clock and calendar, the cost model, the
+NSE sources, the Sanyam store reader) and is copied into each skill folder by
+`tools/vendor.py`, because a skill folder has to stand alone. The suite fails
+if a copy drifts.
+
 ```bash
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s tests -v   # offline, on fixtures cut from real data
+python3 tools/vendor.py --check
+python3 tools/refresh_calendar.py          # when the holiday table runs out
+python3 tools/capture_fixtures.py          # refresh the fixtures
 ```
 
-The tests run offline, on fixtures cut from real data: TSLA's 5-minute bars
-for the 60 days to October 19 2026, the 10:15 AM opening-range scan, Yahoo's
-TSLA headlines that morning, the House Clerk's 2026 index, real PTR text and
-real XBRL facts. They reproduce every number in the example above.
+## Traps found while building this
+
+Each of these answers `200 OK` and is wrong, which is why each has a test.
+
+**The bhavcopy filename is not authoritative.** Ask the archive for a date it
+has no file for and it serves the most recent file it does have. A request for
+10 Nov 2026 returned 09 Nov data, same status, same shape, no warning. Every
+fetch checks the `DATE1` column inside the file.
+
+**`/api/corporates-financial-results` is frozen.** It returns 3,816 rows and
+looks like the market-wide results feed. 2,538 of them were broadcast in
+February 2025 and RELIANCE's newest entry is dated 16 January 2025. A calendar
+built on it reports that nobody is reporting this quarter.
+
+**The announcements feed without a date range returns 20 rows.** Market wide.
+On a busy evening that is about four minutes of news, and it will answer
+"nothing happened" for whatever symbol you asked about. With the range: 3,775
+rows for six days.
+
+**NSE publishes results in lakh.** Read as thousands, RELIANCE becomes a 1,786
+crore-revenue company earning 154 crore: wrong by a hundred and still
+plausible. A uniform scale error cannot be detected from inside one filing, so
+the unit is held by a test pinned to real published figures.
+
+**ETFs trade in series EQ.** Nothing in the bhavcopy marks them and their
+delivery percentage is structurally near 100%, so a delivery signal fires on
+every gold and index fund every day.
+
+**A holiday can still have a session.** Muhurat trading, so `is_trading_day`
+and `session` have to disagree.
 
 ## Fine print
 
 **Not financial advice.** This is software that reads public data and does
-arithmetic. It does not know your situation and it cannot see the future.
-Most people who day trade lose money. You can lose money. Decide for
-yourself, and talk to a licensed professional if you need advice.
+arithmetic. It does not know your situation and cannot see the future. Most
+people who day trade lose money. You can lose money. Talk to a SEBI-registered
+investment adviser if you need advice.
 
-**No trade goes through until you say yes.** Only `/trader-broker` can lead to
-an order, and only after `/trader-risk` passes that exact order and you type
-yes for it in the chat. Set your brokerage tool to "Needs approval" in Claude
-(Customize, Connectors, tool permissions), never "Always allow", so Claude's
-own "Allow once / Deny" card is a second check. No options, margin, short
-selling or leverage unless you turn them on.
+**Nothing here can place an order.** None of these six skills talks to a
+broker. An order reaches one only through Sanyam's risk engine, which has to
+pass that exact order, with you typing yes. Paper trading is the default and
+live execution is off on every start.
 
-**Paper first.** `"paper": true` is the default in `config.example.json`, and
-Alpaca's MCP server defaults to its paper account. Keys live in environment
-variables, never in the chat.
+**The cost rates are dated, not legislated.** They were read on 2026-11-10 from
+NSE's schedule and a discount broker's calculator, and they move with exchange
+and government circulars. Brokerage especially is yours, not a law. Everything
+is overridable in `trader/config.json`. Verify against a real contract note
+before trusting a number to the rupee.
 
-**The Time Machine is a simulation, not a prediction.** It is built from the
-stock's own last 60 days of 5-minute bars. The future can do things those 60
-days never did: an earnings report, a halt, a headline. Treat its odds as a
-reality check, never as a promise.
+**A stop is a plan, not a guarantee.** In a fast market, across a gap, or when
+a name is at its circuit band, a stop can fill well past its price or not fill
+at all. The band case is specific to India and it means a stop can be an order
+the exchange will not accept.
 
-**A stop is a plan, not a guarantee.** In a fast market or across a gap, a
-stop order can fill well past its price. The max loss shown is the loss at
-the stop price.
+**The Time Machine is a simulation.** Built from recent bars, so it cannot
+produce what those bars never did: a results filing, a halt, a block deal, a
+gap. Its odds are a reality check, never a promise.
 
-**The data is free and unofficial.** Yahoo Finance's chart endpoint is not an
-official API: it can lag, change or rate-limit you. The scanner and the entry
-timer read 1-minute or 5-minute bars, not every tick. Check anything that
-matters against your broker before you act on it.
+**The data is free and partly unofficial.** The NSE archive files are the
+exchange's own. Its JSON API is cookie gated and refuses some clients, so a
+403 is normal and the tools degrade rather than crash. Yahoo's chart endpoint
+is not an official API and throttles by IP hard. Check anything that matters
+against your broker before acting on it.
 
-**Day-trading rules.** FINRA removed the $25,000 pattern-day-trader minimum
-on June 4, 2026 (Regulatory Notice 26-10), and brokers may phase the change
-in until October 20, 2027, so yours may still apply the old rule. If it does,
-set `"pdt_guard": true` and `/trader-risk` counts your day trades.
+**Bulk deals and insider filings are disclosures of the past.** Published after
+the fact, by someone whose size and horizon are not yours. Not a tip, and
+copying a fund is not a strategy.
 
-**Congress's trades are public, not inside information.** Members must disclose
-trades over $1,000 within 45 days (the STOCK Act). The Pelosi skill reads those
-public filings the minute they post.
+**Taxes.** Intraday equity gains are speculative business income in India, not
+capital gains, and the treatment differs from delivery trades. Nothing here is
+tax advice.
 
-**Taxes.** Day-trading gains are short-term gains, and frequent trading makes
-wash sales likely. Nothing here is tax advice.
-
-## Files
-
-```
-trader-scanner/     SKILL.md, scan.py
-trader-news/        SKILL.md, news.py
-trader-entry/       SKILL.md, entry.py
-trader-exit/        SKILL.md, exit.py
-trader-timemachine/ SKILL.md, timemachine.py
-trader-risk/        SKILL.md, check.py
-trader-budget/      SKILL.md, size.py, config.example.json, targets.example.json
-trader-broker/      SKILL.md, ticket.py, claude_desktop_config.example.json
-trader-alerts/      SKILL.md, alerts.py, alerts.example.json
-trader-analyst/     SKILL.md, facts.py, metrics.example.json
-trader-pelosi/      SKILL.md, ptr.py
-tests/              unittest suite + offline fixtures
-```
-
-MIT. Made by [Jake Schincariol](https://opusjake.ai).
+MIT, as the original is. Adapted from Jake Schincariol's
+[day-trader-skill](https://github.com/Jakeschincariol/day-trader-skill).

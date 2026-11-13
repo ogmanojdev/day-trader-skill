@@ -1,18 +1,14 @@
 {
-  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
-  "name": "day-trader-skill",
-  "description": "The Day Trader skill pack for Claude: the Trader skill v2",
+  "name": "nse-day-trader-skill",
+  "description": "Six skills for day trading Indian equities on NSE, built on the exchange's own data: whole-market scanning, the corporate filing feed, cost-aware trade replay net of STT, and the 15:15 IST square-off.",
   "owner": {
-    "name": "Jake Schincariol",
-    "url": "https://opusjake.ai"
+    "name": "Manoj Dev"
   },
   "plugins": [
     {
-      "name": "day-trader-skill",
-      "description": "Eleven Claude skills for day trading: a chart scanner, a news monitor, an entry timer, an exit planner, a time machine that replays 10,000 sessions, a risk manager, a budget manager, an order executor (paper by default, never without your yes), price alerts, an earnings analyst and a Pelosi tracker.",
+      "name": "nse-day-trader-skill",
       "source": "./",
-      "category": "productivity",
-      "homepage": "https://github.com/Jakeschincariol/day-trader-skill"
+      "description": "Six Claude skills for day trading Indian equities on NSE: whole-market scanning from the exchange's own bhavcopy, the corporate filing feed, cost-aware trade replay, the 15:15 square-off, filed quarterly results, and daily bulk and block deals."
     }
   ]
 }
